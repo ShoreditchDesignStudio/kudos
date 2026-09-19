@@ -74,21 +74,21 @@ export async function insertWin(input: {
 
   const weekStartDate = currentWeekStart();
 
-  const { data, error } = await db()
-    .from("wins")
-    .insert({
-      sender_slack_id: input.senderSlackId,
-      recipient_slack_ids: recipients,
-      message,
-      week_start_date: weekStartDate,
-    })
-    .select("id")
-    .single();
-
-  if (error || !data) {
-    throw new Error(`insertWin failed: ${error?.message ?? "no row returned"}`);
+  let rows: { id: string }[];
+  try {
+    rows = (await db()`
+      insert into wins (sender_slack_id, recipient_slack_ids, message, week_start_date)
+      values (${input.senderSlackId}, ${recipients}, ${message}, ${weekStartDate})
+      returning id
+    `) as { id: string }[];
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`insertWin failed: ${msg}`);
   }
-  return { id: data.id as string };
+
+  const id = rows[0]?.id;
+  if (!id) throw new Error("insertWin failed: no row returned");
+  return { id };
 }
 
 /**
@@ -96,14 +96,35 @@ export async function insertWin(input: {
  * route to build the week payload.
  */
 export async function getWeekWins(weekStartDate: string): Promise<WinRow[]> {
-  const { data, error } = await db()
-    .from("wins")
-    .select("*")
-    .eq("week_start_date", weekStartDate)
-    .order("created_at", { ascending: true });
+  // week_start_date is cast to text in SQL on purpose: the driver parses a
+  // Postgres `date` into a JS Date, but lib/week.ts compares these values as
+  // YYYY-MM-DD strings (see isWeekClosed). created_at is normalized in JS so
+  // callers always get an ISO string regardless of how the driver parses it.
+  type RawRow = Omit<WinRow, "created_at"> & { created_at: string | Date };
 
-  if (error) throw new Error(`getWeekWins failed: ${error.message}`);
-  return (data ?? []) as WinRow[];
+  let rows: RawRow[];
+  try {
+    rows = (await db()`
+      select id,
+             sender_slack_id,
+             recipient_slack_ids,
+             message,
+             week_start_date::text as week_start_date,
+             created_at
+        from wins
+       where week_start_date = ${weekStartDate}
+       order by created_at asc
+    `) as RawRow[];
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`getWeekWins failed: ${msg}`);
+  }
+
+  return rows.map((r) => ({
+    ...r,
+    created_at:
+      r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
+  }));
 }
 
 /**

@@ -8,9 +8,9 @@
     "start": "next start"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
     "@resvg/resvg-js": "^2.6.2",
     "@slack/web-api": "^7.10.0",
-    "@supabase/supabase-js": "^2.104.0",
     "@tailwindcss/postcss": "^4.2.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

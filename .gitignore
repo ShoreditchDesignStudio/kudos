@@ -5,3 +5,8 @@ node_modules
 .env
 .env.local
 .env.*.local
+supabase/.temp/
+.env.local.*
+tsconfig.tsbuildinfo
+backups/
+.vercel

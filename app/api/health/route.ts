@@ -10,18 +10,14 @@ export async function GET() {
   return NextResponse.json({
     db: dbResult.ok ? "ok" : "fail",
     db_error: dbResult.ok ? undefined : dbResult.error,
-    db_url_set: Boolean(process.env.SUPABASE_URL),
-    db_url_host: process.env.SUPABASE_URL
-      ? safeHost(process.env.SUPABASE_URL)
+    db_url_set: Boolean(process.env.DATABASE_URL),
+    // Host only. The Neon connection string embeds the role password, so we
+    // never echo the URL itself — URL.host is hostname:port and carries no
+    // credentials.
+    db_url_host: process.env.DATABASE_URL
+      ? safeHost(process.env.DATABASE_URL)
       : undefined,
-    db_url_pathname: process.env.SUPABASE_URL
-      ? safePathname(process.env.SUPABASE_URL)
-      : undefined,
-    db_url_has_trailing_slash: process.env.SUPABASE_URL?.endsWith("/") ?? false,
-    db_service_key_set: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
-    db_service_key_prefix: process.env.SUPABASE_SERVICE_ROLE_KEY
-      ? `${process.env.SUPABASE_SERVICE_ROLE_KEY.slice(0, 4)}…(${process.env.SUPABASE_SERVICE_ROLE_KEY.length} chars)`
-      : undefined,
+    db_pooled: process.env.DATABASE_URL?.includes("-pooler.") ?? false,
     slack_token_set: Boolean(process.env.SLACK_BOT_TOKEN),
     reminder_channel_set: Boolean(process.env.SLACK_REMINDER_CHANNEL_ID),
     app_base_url: process.env.APP_BASE_URL ?? null,
@@ -31,8 +27,7 @@ export async function GET() {
 
 async function checkDb(): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    const { error } = await db().from("wins").select("id").limit(1);
-    if (error) return { ok: false, error: `${error.code ?? ""} ${error.message}`.trim() };
+    await db()`select id from wins limit 1`;
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
@@ -42,14 +37,6 @@ async function checkDb(): Promise<{ ok: true } | { ok: false; error: string }> {
 function safeHost(url: string): string {
   try {
     return new URL(url).host;
-  } catch {
-    return "(invalid URL)";
-  }
-}
-
-function safePathname(url: string): string {
-  try {
-    return new URL(url).pathname;
   } catch {
     return "(invalid URL)";
   }

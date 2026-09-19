@@ -1,0 +1,48 @@
+name: Backup Database
+
+# Weekly logical backup of the wins table, kept as a workflow artifact.
+#
+# Neon's free tier retains only 6 hours of branch history
+# (history_retention_seconds = 21600), so point-in-time restore cannot
+# recover anything older than that. A weekly dump is the real safety net.
+#
+# Runs Friday 02:00 UTC — after Thursday's digest week has closed, so each
+# dump contains a complete week.
+#
+# Requires repo secret: DATABASE_URL (the Neon connection string).
+
+on:
+  schedule:
+    - cron: "0 2 * * 5"
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Install postgresql-client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      - name: Dump wins table
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [[ -z "$DATABASE_URL" ]]; then
+            echo "::error::DATABASE_URL must be set as a repo secret"
+            exit 1
+          fi
+          pg_dump "$DATABASE_URL" \
+            --table=wins --no-owner --no-privileges \
+            > "kudos-$(date +%F).sql"
+          echo "rows in dump: $(grep -c '^[0-9a-f]\{8\}-' "kudos-$(date +%F).sql" || true)"
+          ls -la kudos-*.sql
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kudos-db-backup
+          path: kudos-*.sql
+          retention-days: 90

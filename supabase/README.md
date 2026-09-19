@@ -1,3 +1,8 @@
+> **Retained for reference only.** The live database moved to Neon Postgres.
+> Nothing here is applied any more — the active schema is `db/0001_init.sql`.
+> These files are kept so the Supabase setup can be reconstructed if we ever
+> revert. See `docs/db-migration.md`.
+
 # Supabase
 
 Single Postgres table. No Auth, no RLS, no Storage, no Edge Functions.
