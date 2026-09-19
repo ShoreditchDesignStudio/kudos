@@ -35,12 +35,16 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
           sudo apt-get update -qq
           sudo apt-get install -y -qq postgresql-client-18
-          pg_dump --version
+          # Debian's /usr/bin/pg_dump is the pg_wrapper symlink, which still
+          # resolves to the older major even once 18 is installed. Put the
+          # real 18 binaries first on PATH.
+          echo "/usr/lib/postgresql/18/bin" >> "$GITHUB_PATH"
 
       - name: Dump wins table
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
+          pg_dump --version
           if [[ -z "$DATABASE_URL" ]]; then
             echo "::error::DATABASE_URL must be set as a repo secret"
             exit 1
