@@ -81,6 +81,19 @@ export async function POST(req: Request) {
   if (!submission.isEveryone && submission.recipientSlackIds.length === 0) {
     errors[RECIPIENTS_BLOCK_ID] = "Pick at least one person, or tick 'Add whole team'.";
   }
+  // insertWin strips the sender from their own recipient list, so a win
+  // addressed only to yourself arrives here with a non-empty list and then
+  // throws deep in the insert. Catch it as a field error instead — otherwise
+  // the user sees "Couldn't save — ping #help" for what is a valid, ordinary
+  // mistake.
+  if (
+    !submission.isEveryone &&
+    submission.recipientSlackIds.length > 0 &&
+    submission.recipientSlackIds.every((id) => id === submission.senderSlackId)
+  ) {
+    errors[RECIPIENTS_BLOCK_ID] =
+      "Pick someone other than yourself — a win has to go to a teammate.";
+  }
   if (!submission.message.trim()) {
     errors[MESSAGE_BLOCK_ID] = "Add a short message.";
   }
